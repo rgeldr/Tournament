@@ -1,0 +1,40 @@
+package com.cobaltkeep.tournament.service;
+
+import com.cobaltkeep.tournament.entity.Tournament;
+import com.cobaltkeep.tournament.repository.TournamentRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+import java.util.Optional;
+
+@Service
+public class TournamentService {
+
+    @Autowired
+    private TournamentRepository tournamentRepository;
+
+    public List<Tournament> getAllTournaments() {
+        return tournamentRepository.findAll();
+    }
+
+    public Optional<Tournament> getTournamentById(Long id) {
+        return tournamentRepository.findById(id);
+    }
+
+    public Tournament createTournament(Tournament tournament) {
+        return tournamentRepository.save(tournament);
+    }
+
+    public Tournament updateTournament(Long id, Tournament tournamentDetails) {
+        Tournament tournament = tournamentRepository.findById(id).orElseThrow();
+        tournament.setName(tournamentDetails.getName());
+        tournament.setStartDate(tournamentDetails.getStartDate());
+        tournament.setEndDate(tournamentDetails.getEndDate());
+        return tournamentRepository.save(tournament);
+    }
+
+    public void deleteTournament(Long id) {
+        tournamentRepository.deleteById(id);
+    }
+}
