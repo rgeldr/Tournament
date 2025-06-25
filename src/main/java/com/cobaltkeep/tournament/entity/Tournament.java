@@ -22,6 +22,9 @@ public class Tournament {
     @Column(name = "end_date")
     private LocalDate endDate;
 
+    @Column(name = "locked")
+    private boolean locked = false;
+
     @ManyToMany
     @JoinTable(
             name = "tournament_player",
@@ -30,8 +33,10 @@ public class Tournament {
     )
     private Set<Player> players = new HashSet<>();
 
+    // No-arg constructor
     public Tournament() {}
 
+    // Constructor with fields
     public Tournament(String name, LocalDate startDate, LocalDate endDate) {
         this.name = name;
         this.startDate = startDate;
@@ -47,8 +52,9 @@ public class Tournament {
     public void setStartDate(LocalDate startDate) { this.startDate = startDate; }
     public LocalDate getEndDate() { return endDate; }
     public void setEndDate(LocalDate endDate) { this.endDate = endDate; }
+    public boolean isLocked() { return locked; }
+    public void setLocked(boolean locked) { this.locked = locked; }
     public Set<Player> getPlayers() { return players; }
     public void setPlayers(Set<Player> players) { this.players = players; }
-    public void addPlayer(Player player) { this.players.add(player);
-    }
+    public void addPlayer(Player player) { this.players.add(player); }
 }

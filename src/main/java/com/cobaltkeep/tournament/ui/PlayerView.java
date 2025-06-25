@@ -30,8 +30,9 @@ public class PlayerView extends VerticalLayout implements HasUrlParameter<Long> 
     private final TextField email = new TextField("Player Email");
     private final Button saveButton = new Button("Save");
     private final Button backButton = new Button("Back to Tournaments");
-    private final Binder<Player> binder = new Binder<>(Player.class);
     private final Button deleteButton = new Button("Delete");
+    private final Button startTournamentButton = new Button("Start Tournament");
+    private final Binder<Player> binder = new Binder<>(Player.class);
 
     @Autowired
     public PlayerView(PlayerService playerService, TournamentService tournamentService) {
@@ -50,15 +51,14 @@ public class PlayerView extends VerticalLayout implements HasUrlParameter<Long> 
         // Configure buttons
         saveButton.addClickListener(event -> savePlayer());
         backButton.addClickListener(event -> getUI().ifPresent(ui -> ui.navigate("")));
-
-        // Layout
-        HorizontalLayout formLayout = new HorizontalLayout(name, email, saveButton, backButton);
-        add(grid, formLayout);
-
         deleteButton.addClickListener(event -> deletePlayer());
         deleteButton.setEnabled(false);
         grid.asSingleSelect().addValueChangeListener(event -> deleteButton.setEnabled(event.getValue() != null));
-        formLayout.add(deleteButton);
+        startTournamentButton.addClickListener(event -> startTournament());
+
+        // Layout
+        HorizontalLayout formLayout = new HorizontalLayout(name, email, saveButton, deleteButton, backButton, startTournamentButton);
+        add(grid, formLayout);
     }
 
     @Override
@@ -69,6 +69,9 @@ public class PlayerView extends VerticalLayout implements HasUrlParameter<Long> 
                 .orElseThrow(() -> new IllegalArgumentException("Tournament not found"));
         grid.setItems(tournament.getPlayers());
         Notification.show("Viewing players for tournament: " + tournament.getName());
+
+        // Update button states
+        updateButtonStates(tournament);
 
         // Check if there are no players and prompt to add one
         if (tournament.getPlayers().isEmpty()) {
@@ -95,22 +98,17 @@ public class PlayerView extends VerticalLayout implements HasUrlParameter<Long> 
             binder.writeBean(player);
             playerService.createPlayer(player, tournamentId);
             Notification.show("Player added to tournament");
-            // Refresh grid
+            // Refresh grid and button states
             Tournament tournament = tournamentService.getTournamentById(tournamentId)
                     .orElseThrow(() -> new IllegalArgumentException("Tournament not found"));
             grid.setItems(tournament.getPlayers());
+            updateButtonStates(tournament);
             clearForm();
         } catch (ValidationException e) {
             Notification.show("Validation error: " + e.getMessage());
         } catch (Exception e) {
             Notification.show("Error saving player: " + e.getMessage());
         }
-    }
-
-    private void clearForm() {
-        binder.removeBean();
-        name.clear();
-        email.clear();
     }
 
     private void deletePlayer() {
@@ -124,6 +122,7 @@ public class PlayerView extends VerticalLayout implements HasUrlParameter<Long> 
                 tournamentService.createTournament(tournament);
                 grid.setItems(tournament.getPlayers());
                 Notification.show("Player removed from tournament");
+                updateButtonStates(tournament);
                 clearForm();
             } catch (Exception e) {
                 Notification.show("Error removing player: " + e.getMessage());
@@ -131,4 +130,32 @@ public class PlayerView extends VerticalLayout implements HasUrlParameter<Long> 
         }
     }
 
+    private void startTournament() {
+        try {
+            Tournament tournament = tournamentService.getTournamentById(tournamentId)
+                    .orElseThrow(() -> new IllegalArgumentException("Tournament not found"));
+            tournament.setLocked(true);
+            tournamentService.createTournament(tournament);
+            Notification.show("Tournament started!");
+            getUI().ifPresent(ui -> ui.navigate("bracket/" + tournamentId));
+        } catch (Exception e) {
+            Notification.show("Error starting tournament: " + e.getMessage());
+        }
+    }
+
+    private void updateButtonStates(Tournament tournament) {
+        saveButton.setEnabled(!tournament.isLocked());
+        deleteButton.setEnabled(!tournament.isLocked() && grid.asSingleSelect().getValue() != null);
+        int playerCount = tournament.getPlayers().size();
+        boolean canStart = playerCount >= 4 && playerCount % 2 == 0;
+        startTournamentButton.setEnabled(canStart);
+        startTournamentButton.setTooltipText(canStart ? "Start the tournament" :
+                playerCount < 4 ? "Need at least 4 players" : "Need an even number of players");
+    }
+
+    private void clearForm() {
+        binder.removeBean();
+        name.clear();
+        email.clear();
+    }
 }
