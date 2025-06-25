@@ -15,12 +15,17 @@ import com.vaadin.flow.data.renderer.ComponentRenderer;
 import com.vaadin.flow.router.Route;
 import com.vaadin.flow.router.RouterLink;
 import org.springframework.beans.factory.annotation.Autowired;
+import com.vaadin.flow.component.orderedlayout.FlexComponent;
+import com.vaadin.flow.component.tabs.Tab;
+import com.vaadin.flow.component.tabs.Tabs;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 
 @Route("")
 public class TournamentView extends VerticalLayout {
+
+
 
     private final TournamentService tournamentService;
     private final Grid<Tournament> grid = new Grid<>(Tournament.class);
@@ -35,6 +40,21 @@ public class TournamentView extends VerticalLayout {
     @Autowired
     public TournamentView(TournamentService tournamentService) {
         this.tournamentService = tournamentService;
+
+        Tabs tabs = new Tabs();
+        Tab tournamentsTab = new Tab(new RouterLink("Tournaments", TournamentView.class));
+        Tab playersTab = new Tab(new RouterLink("Players", PlayerView.class, 0L)); // Placeholder ID
+        tabs.add(tournamentsTab, playersTab);
+        tabs.setWidthFull();
+        add(tabs);
+        setAlignItems(FlexComponent.Alignment.STRETCH);
+
+        grid.setWidthFull();
+        HorizontalLayout formLayout = null;
+        formLayout.setAlignItems(FlexComponent.Alignment.BASELINE);
+        name.setWidth("200px");
+        startDate.setWidth("150px");
+        endDate.setWidth("150px");
 
         // Configure grid
         // Clear all default columns to avoid duplicates
@@ -73,7 +93,7 @@ public class TournamentView extends VerticalLayout {
         deleteButton.setEnabled(false);
 
         // Layout
-        HorizontalLayout formLayout = new HorizontalLayout(name, startDate, endDate, saveButton, clearButton, deleteButton);
+        formLayout = new HorizontalLayout(name, startDate, endDate, saveButton, clearButton, deleteButton);
         add(grid, formLayout);
 
         // Load data
