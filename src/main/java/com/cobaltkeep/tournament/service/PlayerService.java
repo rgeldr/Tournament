@@ -28,7 +28,7 @@ public class PlayerService {
 
         // Link to tournament if tournamentId is provided
         if (tournamentId != null) {
-            Tournament tournament = tournamentRepository.findById(tournamentId)
+            Tournament tournament = tournamentRepository.findByIdWithPlayers(tournamentId)
                     .orElseThrow(() -> new IllegalArgumentException("Tournament not found"));
             tournament.addPlayer(savedPlayer);
             savedPlayer.addTournament(tournament);

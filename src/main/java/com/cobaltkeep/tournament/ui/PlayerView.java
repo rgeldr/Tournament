@@ -5,8 +5,10 @@ import com.cobaltkeep.tournament.entity.Tournament;
 import com.cobaltkeep.tournament.service.PlayerService;
 import com.cobaltkeep.tournament.service.TournamentService;
 import com.vaadin.flow.component.button.Button;
+import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.notification.Notification;
+import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.textfield.TextField;
@@ -28,6 +30,7 @@ public class PlayerView extends VerticalLayout implements HasUrlParameter<Long> 
     private final TextField email = new TextField("Player Email");
     private final Button saveButton = new Button("Save");
     private final Button backButton = new Button("Back to Tournaments");
+    private final Button deleteButton = new Button("Delete");
     private final Binder<Player> binder = new Binder<>(Player.class);
 
     @Autowired
@@ -36,7 +39,7 @@ public class PlayerView extends VerticalLayout implements HasUrlParameter<Long> 
         this.tournamentService = tournamentService;
 
         // Configure grid
-        grid.setColumns("id", "name", "email");
+        grid.setColumns("name", "email", "id");
 
         // Configure form
         binder.forField(name).asRequired("Name is required").bind(Player::getName, Player::setName);
@@ -51,6 +54,11 @@ public class PlayerView extends VerticalLayout implements HasUrlParameter<Long> 
         // Layout
         HorizontalLayout formLayout = new HorizontalLayout(name, email, saveButton, backButton);
         add(grid, formLayout);
+
+        deleteButton.addClickListener(event -> deletePlayer());
+        deleteButton.setEnabled(false);
+        grid.asSingleSelect().addValueChangeListener(event -> deleteButton.setEnabled(event.getValue() != null));
+        formLayout.add(deleteButton);
     }
 
     @Override
@@ -61,6 +69,31 @@ public class PlayerView extends VerticalLayout implements HasUrlParameter<Long> 
                 .orElseThrow(() -> new IllegalArgumentException("Tournament not found"));
         grid.setItems(tournament.getPlayers());
         Notification.show("Viewing players for tournament: " + tournament.getName());
+
+        Dialog dialog = null;
+        dialog.setWidth("400px");
+        VerticalLayout dialogLayout = null;
+        dialogLayout.setAlignItems(Alignment.CENTER);
+
+        // Check if there are no players and prompt to add one
+        if (tournament.getPlayers().isEmpty()) {
+            dialog = new Dialog();
+            dialog.setHeaderTitle("No Players Found");
+            dialogLayout = new VerticalLayout();
+            dialogLayout.add("This tournament has no players. Would you like to add a new player?");
+            Dialog finalDialog = dialog;
+            Button addPlayerButton = new Button("Add Player", e -> {
+                name.focus();
+                finalDialog.close();
+            });
+            Dialog finalDialog1 = dialog;
+            Button cancelButton = new Button("Cancel", e -> finalDialog1.close());
+            dialogLayout.add(new HorizontalLayout(addPlayerButton, cancelButton));
+            dialog.add(dialogLayout);
+            dialog.open();
+        } else {
+            dialog = null;
+        }
     }
 
     private void savePlayer() {
@@ -85,5 +118,23 @@ public class PlayerView extends VerticalLayout implements HasUrlParameter<Long> 
         binder.removeBean();
         name.clear();
         email.clear();
+    }
+
+    private void deletePlayer() {
+        Player selected = grid.asSingleSelect().getValue();
+        if (selected != null) {
+            try {
+                Tournament tournament = tournamentService.getTournamentById(tournamentId)
+                        .orElseThrow(() -> new IllegalArgumentException("Tournament not found"));
+                tournament.getPlayers().remove(selected);
+                selected.getTournaments().remove(tournament);
+                tournamentService.createTournament(tournament);
+                grid.setItems(tournament.getPlayers());
+                Notification.show("Player removed from tournament");
+                clearForm();
+            } catch (Exception e) {
+                Notification.show("Error removing player: " + e.getMessage());
+            }
+        }
     }
 }

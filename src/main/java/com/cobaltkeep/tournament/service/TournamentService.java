@@ -15,17 +15,14 @@ public class TournamentService {
     private TournamentRepository tournamentRepository;
 
     public List<Tournament> getAllTournaments() {
-
         return tournamentRepository.findAll();
     }
 
     public Optional<Tournament> getTournamentById(Long id) {
-
-        return tournamentRepository.findById(id);
+        return tournamentRepository.findByIdWithPlayers(id);
     }
 
     public Tournament createTournament(Tournament tournament) {
-
         return tournamentRepository.save(tournament);
     }
 

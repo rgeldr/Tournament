@@ -8,30 +8,27 @@ import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.textfield.TextField;
+import com.vaadin.flow.component.datepicker.DatePicker;
 import com.vaadin.flow.data.binder.Binder;
 import com.vaadin.flow.data.binder.ValidationException;
-import com.vaadin.flow.data.converter.StringToDateConverter;
 import com.vaadin.flow.data.renderer.ComponentRenderer;
 import com.vaadin.flow.router.Route;
 import com.vaadin.flow.router.RouterLink;
-import org.springframework.beans.factory.annotation.Autowired;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.tabs.Tab;
 import com.vaadin.flow.component.tabs.Tabs;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
 
 @Route("")
 public class TournamentView extends VerticalLayout {
 
-
-
     private final TournamentService tournamentService;
     private final Grid<Tournament> grid = new Grid<>(Tournament.class);
     private final TextField name = new TextField("Tournament Name");
-    private final TextField startDate = new TextField("Start Date (YYYY-MM-DD)");
-    private final TextField endDate = new TextField("End Date (YYYY-MM-DD)");
+    private final DatePicker startDate = new DatePicker("Start Date");
+    private final DatePicker endDate = new DatePicker("End Date");
     private final Button saveButton = new Button("Save");
     private final Button clearButton = new Button("Clear");
     private final Button deleteButton = new Button("Delete");
@@ -41,6 +38,7 @@ public class TournamentView extends VerticalLayout {
     public TournamentView(TournamentService tournamentService) {
         this.tournamentService = tournamentService;
 
+        // Navigation tabs
         Tabs tabs = new Tabs();
         Tab tournamentsTab = new Tab(new RouterLink("Tournaments", TournamentView.class));
         Tab playersTab = new Tab(new RouterLink("Players", PlayerView.class, 0L)); // Placeholder ID
@@ -49,22 +47,13 @@ public class TournamentView extends VerticalLayout {
         add(tabs);
         setAlignItems(FlexComponent.Alignment.STRETCH);
 
-        grid.setWidthFull();
-        HorizontalLayout formLayout = null;
-        formLayout.setAlignItems(FlexComponent.Alignment.BASELINE);
-        name.setWidth("200px");
-        startDate.setWidth("150px");
-        endDate.setWidth("150px");
-
         // Configure grid
-        // Clear all default columns to avoid duplicates
+        grid.setWidthFull();
         grid.removeAllColumns();
-        // Add custom name column with RouterLink
         grid.addColumn(new ComponentRenderer<>(tournament -> {
             RouterLink link = new RouterLink(tournament.getName(), PlayerView.class, tournament.getId());
             return link;
         })).setHeader("Name");
-        // Add other columns explicitly
         grid.addColumn(Tournament::getId).setHeader("ID");
         grid.addColumn(Tournament::getStartDate).setHeader("Start Date");
         grid.addColumn(Tournament::getEndDate).setHeader("End Date");
@@ -80,10 +69,9 @@ public class TournamentView extends VerticalLayout {
         // Configure form
         binder.forField(name).asRequired("Name is required").bind(Tournament::getName, Tournament::setName);
         binder.forField(startDate)
-                .withConverter(new StringToDateConverter(DateTimeFormatter.ISO_LOCAL_DATE, "Invalid date format, use YYYY-MM-DD"))
+                .asRequired("Start date is required")
                 .bind(Tournament::getStartDate, Tournament::setStartDate);
         binder.forField(endDate)
-                .withConverter(new StringToDateConverter(DateTimeFormatter.ISO_LOCAL_DATE, "Invalid date format, use YYYY-MM-DD"))
                 .bind(Tournament::getEndDate, Tournament::setEndDate);
 
         // Configure buttons
@@ -93,7 +81,11 @@ public class TournamentView extends VerticalLayout {
         deleteButton.setEnabled(false);
 
         // Layout
-        formLayout = new HorizontalLayout(name, startDate, endDate, saveButton, clearButton, deleteButton);
+        HorizontalLayout formLayout = new HorizontalLayout(name, startDate, endDate, saveButton, clearButton, deleteButton);
+        formLayout.setAlignItems(FlexComponent.Alignment.BASELINE);
+        name.setWidth("200px");
+        startDate.setWidth("150px");
+        endDate.setWidth("150px");
         add(grid, formLayout);
 
         // Load data
@@ -141,8 +133,8 @@ public class TournamentView extends VerticalLayout {
     private void clearForm() {
         binder.removeBean();
         name.clear();
-        startDate.clear();
-        endDate.clear();
+        startDate.setValue(null);
+        endDate.setValue(null);
         deleteButton.setEnabled(false);
     }
 }
