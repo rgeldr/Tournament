@@ -30,8 +30,8 @@ public class PlayerView extends VerticalLayout implements HasUrlParameter<Long> 
     private final TextField email = new TextField("Player Email");
     private final Button saveButton = new Button("Save");
     private final Button backButton = new Button("Back to Tournaments");
-    private final Button deleteButton = new Button("Delete");
     private final Binder<Player> binder = new Binder<>(Player.class);
+    private final Button deleteButton = new Button("Delete");
 
     @Autowired
     public PlayerView(PlayerService playerService, TournamentService tournamentService) {
@@ -39,7 +39,7 @@ public class PlayerView extends VerticalLayout implements HasUrlParameter<Long> 
         this.tournamentService = tournamentService;
 
         // Configure grid
-        grid.setColumns("name", "email", "id");
+        grid.setColumns("id", "name", "email");
 
         // Configure form
         binder.forField(name).asRequired("Name is required").bind(Player::getName, Player::setName);
@@ -70,29 +70,22 @@ public class PlayerView extends VerticalLayout implements HasUrlParameter<Long> 
         grid.setItems(tournament.getPlayers());
         Notification.show("Viewing players for tournament: " + tournament.getName());
 
-        Dialog dialog = null;
-        dialog.setWidth("400px");
-        VerticalLayout dialogLayout = null;
-        dialogLayout.setAlignItems(Alignment.CENTER);
-
         // Check if there are no players and prompt to add one
         if (tournament.getPlayers().isEmpty()) {
-            dialog = new Dialog();
+            Dialog dialog = new Dialog();
             dialog.setHeaderTitle("No Players Found");
-            dialogLayout = new VerticalLayout();
+            dialog.setWidth("400px");
+            VerticalLayout dialogLayout = new VerticalLayout();
             dialogLayout.add("This tournament has no players. Would you like to add a new player?");
-            Dialog finalDialog = dialog;
+            dialogLayout.setAlignItems(FlexComponent.Alignment.CENTER);
             Button addPlayerButton = new Button("Add Player", e -> {
                 name.focus();
-                finalDialog.close();
+                dialog.close();
             });
-            Dialog finalDialog1 = dialog;
-            Button cancelButton = new Button("Cancel", e -> finalDialog1.close());
+            Button cancelButton = new Button("Cancel", e -> dialog.close());
             dialogLayout.add(new HorizontalLayout(addPlayerButton, cancelButton));
             dialog.add(dialogLayout);
             dialog.open();
-        } else {
-            dialog = null;
         }
     }
 
@@ -137,4 +130,5 @@ public class PlayerView extends VerticalLayout implements HasUrlParameter<Long> 
             }
         }
     }
+
 }
