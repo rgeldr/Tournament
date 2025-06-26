@@ -14,6 +14,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -26,13 +27,13 @@ public class BracketView extends VerticalLayout implements HasUrlParameter<Long>
     private Long tournamentId;
     private List<List<Player>> rounds = new ArrayList<>();
     private List<Player> losers = new ArrayList<>();
-    private Map<String, Player> matchResults = new HashMap<>(); // Key: "roundIndex_player1Id_player2Id", Value: winner
+    private Map<String, Player> matchResults = new HashMap<>(); // Key: "roundIndex_player1Id_player2Id" or "losers_player1Id_player2Id", Value: winner
 
     @Autowired
     public BracketView(TournamentService tournamentService) {
         this.tournamentService = tournamentService;
         // Add CSS for winner highlight
-        getStyle().set("winner-button", "border: 2px solid green; padding: 5px;");
+        getStyle().set("winner-button", "border: 2px solid green; padding: 5px");
     }
 
     @Override
@@ -54,6 +55,12 @@ public class BracketView extends VerticalLayout implements HasUrlParameter<Long>
         List<Player> randomizedPlayers = new ArrayList<>(players);
         Collections.shuffle(randomizedPlayers);
         rounds.add(randomizedPlayers);
+    }
+
+    private int getPlayerWins(Player player) {
+        return (int) matchResults.values().stream()
+                .filter(winner -> winner.equals(player))
+                .count();
     }
 
     private void renderBracket() {
@@ -100,24 +107,28 @@ public class BracketView extends VerticalLayout implements HasUrlParameter<Long>
             add(roundLayout);
         }
 
-        // Losers bracket
+        // Losers matches (without "Losers Bracket" title)
         if (!losers.isEmpty()) {
             VerticalLayout losersLayout = new VerticalLayout();
-            losersLayout.add(new H3("Losers Bracket"));
             losersLayout.setWidth("400px");
-            List<Player> randomizedLosers = new ArrayList<>(losers);
-            Collections.shuffle(randomizedLosers);
-            for (int i = 0; i < randomizedLosers.size(); i += 2) {
-                if (i + 1 < randomizedLosers.size()) {
-                    Player player1 = randomizedLosers.get(i);
-                    Player player2 = randomizedLosers.get(i + 1);
+
+            // Sort losers by wins (descending)
+            List<Player> sortedLosers = new ArrayList<>(losers);
+            sortedLosers.sort((p1, p2) -> Integer.compare(getPlayerWins(p2), getPlayerWins(p1)));
+
+            for (int i = 0; i < sortedLosers.size(); i += 2) {
+                if (i + 1 < sortedLosers.size()) {
+                    Player player1 = sortedLosers.get(i);
+                    Player player2 = sortedLosers.get(i + 1);
                     String matchKey = "losers_" + player1.getId() + "_" + player2.getId();
                     Player winner = matchResults.get(matchKey);
 
                     HorizontalLayout matchLayout = new HorizontalLayout();
                     matchLayout.setAlignItems(Alignment.CENTER);
-                    Button winner1Button = new Button(player1.getFullName(), e -> advanceLoser(player1, player2));
-                    Button winner2Button = new Button(player2.getFullName(), e -> advanceLoser(player2, player1));
+                    Button winner1Button = new Button(player1.getFullName() + " (" + getPlayerWins(player1) + " wins)",
+                            e -> advanceLoser(player1, player2));
+                    Button winner2Button = new Button(player2.getFullName() + " (" + getPlayerWins(player2) + " wins)",
+                            e -> advanceLoser(player2, player1));
 
                     // Highlight winner
                     if (winner != null) {
