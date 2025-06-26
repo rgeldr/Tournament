@@ -37,4 +37,7 @@ public class TournamentService {
     public void deleteTournament(Long id) {
         tournamentRepository.deleteById(id);
     }
+
+    public void unlockTournament(Tournament tournament) {
+    }
 }

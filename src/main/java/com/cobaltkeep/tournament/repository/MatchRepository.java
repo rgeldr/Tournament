@@ -11,4 +11,5 @@ import java.util.List;
 public interface MatchRepository extends JpaRepository<Match, Long> {
     List<Match> findByTournamentAndBracketType(Tournament tournament, String bracketType);
     List<Match> findByTournamentAndBracketTypeAndRound(Tournament tournament, String bracketType, int round);
+    void deleteByTournament(Tournament tournament);
 }

@@ -1,12 +1,15 @@
 package com.cobaltkeep.tournament.ui;
 
+import com.cobaltkeep.tournament.entity.Match;
 import com.cobaltkeep.tournament.entity.Player;
 import com.cobaltkeep.tournament.entity.Tournament;
+import com.cobaltkeep.tournament.service.MatchService;
 import com.cobaltkeep.tournament.service.TournamentService;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.html.H3;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
+import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.router.BeforeEvent;
 import com.vaadin.flow.router.HasUrlParameter;
 import com.vaadin.flow.router.Route;
@@ -14,26 +17,28 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 @Route("bracket")
 public class BracketView extends VerticalLayout implements HasUrlParameter<Long> {
 
     private final TournamentService tournamentService;
+    private final MatchService matchService;
     private Long tournamentId;
     private List<List<Player>> rounds = new ArrayList<>();
     private List<Player> losers = new ArrayList<>();
-    private Map<String, Player> matchResults = new HashMap<>(); // Key: "roundIndex_player1Id_player2Id" or "losers_player1Id_player2Id", Value: winner
+    private Map<String, Match> matchMap = new HashMap<>(); // Key: "roundIndex_player1Id_player2Id" or "losers_player1Id_player2Id"
+    private final Button resetButton = new Button("Reset Bracket");
 
     @Autowired
-    public BracketView(TournamentService tournamentService) {
+    public BracketView(TournamentService tournamentService, MatchService matchService) {
         this.tournamentService = tournamentService;
-        // Add CSS for winner highlight
+        this.matchService = matchService;
         getStyle().set("winner-button", "border: 2px solid green; padding: 5px");
+        resetButton.addClickListener(e -> resetBracket());
+        add(resetButton);
     }
 
     @Override
@@ -44,28 +49,81 @@ public class BracketView extends VerticalLayout implements HasUrlParameter<Long>
         if (tournament.getPlayers().size() < 4 || tournament.getPlayers().size() % 2 != 0) {
             throw new IllegalStateException("Tournament must have at least 4 players and an even number");
         }
-        initializeBracket(new ArrayList<>(tournament.getPlayers()));
+        initializeBracket(tournament);
         renderBracket();
     }
 
-    private void initializeBracket(List<Player> players) {
+    private void initializeBracket(Tournament tournament) {
         rounds.clear();
         losers.clear();
-        matchResults.clear();
-        List<Player> randomizedPlayers = new ArrayList<>(players);
-        Collections.shuffle(randomizedPlayers);
-        rounds.add(randomizedPlayers);
+        matchMap.clear();
+
+        // Load existing matches
+        List<Match> existingMatches = matchService.getMatchesByTournamentAndBracketType(tournament, "main");
+        if (existingMatches.isEmpty()) {
+            // Initialize first round
+            List<Player> randomizedPlayers = new ArrayList<>(tournament.getPlayers());
+            Collections.shuffle(randomizedPlayers);
+            rounds.add(randomizedPlayers);
+            // Create matches for first round
+            for (int i = 0; i < randomizedPlayers.size(); i += 2) {
+                if (i + 1 < randomizedPlayers.size()) {
+                    Player player1 = randomizedPlayers.get(i);
+                    Player player2 = randomizedPlayers.get(i + 1);
+                    Match match = matchService.createMatch(player1, player2, 0, "main", tournament);
+                    matchMap.put("0_" + player1.getId() + "_" + player2.getId(), match);
+                }
+            }
+        } else {
+            // Reconstruct rounds from existing matches
+            int maxRound = existingMatches.stream().mapToInt(Match::getRound).max().orElse(0);
+            for (int roundIndex = 0; roundIndex <= maxRound; roundIndex++) {
+                List<Player> round = new ArrayList<>();
+                List<Match> roundMatches = matchService.getMatchesByTournamentAndBracketTypeAndRound(tournament, "main", roundIndex);
+                for (Match match : roundMatches) {
+                    round.add(match.getPlayer1());
+                    round.add(match.getPlayer2());
+                    matchMap.put(roundIndex + "_" + match.getPlayer1().getId() + "_" + match.getPlayer2().getId(), match);
+                    if (match.getWinner() != null && !match.getWinner().equals(match.getPlayer1())) {
+                        losers.add(match.getPlayer1());
+                    } else if (match.getWinner() != null) {
+                        losers.add(match.getPlayer2());
+                    }
+                }
+                if (!round.isEmpty()) {
+                    rounds.add(round);
+                }
+            }
+        }
+
+        // Load losers matches
+        List<Match> losersMatches = matchService.getMatchesByTournamentAndBracketType(tournament, "losers");
+        for (Match match : losersMatches) {
+            matchMap.put("losers_" + match.getPlayer1().getId() + "_" + match.getPlayer2().getId(), match);
+            if (match.getWinner() != null && !match.getWinner().equals(match.getPlayer1())) {
+                losers.remove(match.getPlayer1());
+                losers.add(match.getWinner());
+            } else if (match.getWinner() != null) {
+                losers.remove(match.getPlayer2());
+                losers.add(match.getWinner());
+            }
+        }
     }
 
     private int getPlayerWins(Player player) {
-        return (int) matchResults.values().stream()
-                .filter(winner -> winner.equals(player))
+        return (int) matchService.getMatchesByTournamentAndBracketType(tournamentService.getTournamentById(tournamentId).get(), "main")
+                .stream()
+                .filter(m -> m.getWinner() != null && m.getWinner().equals(player))
+                .count()
+                + (int) matchService.getMatchesByTournamentAndBracketType(tournamentService.getTournamentById(tournamentId).get(), "losers")
+                .stream()
+                .filter(m -> m.getWinner() != null && m.getWinner().equals(player))
                 .count();
     }
 
     private void renderBracket() {
         removeAll();
-        add(new H3("Tournament Bracket"));
+        add(new H3("Tournament Bracket"), resetButton);
 
         for (int roundIndex = 0; roundIndex < rounds.size(); roundIndex++) {
             List<Player> round = rounds.get(roundIndex);
@@ -78,7 +136,8 @@ public class BracketView extends VerticalLayout implements HasUrlParameter<Long>
                     Player player1 = round.get(i);
                     Player player2 = round.get(i + 1);
                     String matchKey = roundIndex + "_" + player1.getId() + "_" + player2.getId();
-                    Player winner = matchResults.get(matchKey);
+                    Match match = matchMap.get(matchKey);
+                    Player winner = match != null ? match.getWinner() : null;
 
                     HorizontalLayout matchLayout = new HorizontalLayout();
                     matchLayout.setAlignItems(Alignment.CENTER);
@@ -107,7 +166,7 @@ public class BracketView extends VerticalLayout implements HasUrlParameter<Long>
             add(roundLayout);
         }
 
-        // Losers matches (without "Losers Bracket" title)
+        // Losers matches
         if (!losers.isEmpty()) {
             VerticalLayout losersLayout = new VerticalLayout();
             losersLayout.setWidth("400px");
@@ -121,7 +180,15 @@ public class BracketView extends VerticalLayout implements HasUrlParameter<Long>
                     Player player1 = sortedLosers.get(i);
                     Player player2 = sortedLosers.get(i + 1);
                     String matchKey = "losers_" + player1.getId() + "_" + player2.getId();
-                    Player winner = matchResults.get(matchKey);
+                    Match match = matchMap.get(matchKey);
+                    Player winner = match != null ? match.getWinner() : null;
+
+                    // Create match if it doesn't exist
+                    if (match == null) {
+                        match = matchService.createMatch(player1, player2, 0, "losers",
+                                tournamentService.getTournamentById(tournamentId).get());
+                        matchMap.put(matchKey, match);
+                    }
 
                     HorizontalLayout matchLayout = new HorizontalLayout();
                     matchLayout.setAlignItems(Alignment.CENTER);
@@ -158,7 +225,10 @@ public class BracketView extends VerticalLayout implements HasUrlParameter<Long>
 
     private void advancePlayer(Player winner, Player loser, int roundIndex) {
         String matchKey = roundIndex + "_" + winner.getId() + "_" + loser.getId();
-        matchResults.put(matchKey, winner);
+        Match match = matchMap.get(matchKey);
+        if (match != null) {
+            matchService.updateMatchWinner(match, winner);
+        }
         losers.add(loser);
 
         // Check if all matches in the current round are complete
@@ -167,7 +237,8 @@ public class BracketView extends VerticalLayout implements HasUrlParameter<Long>
         for (int i = 0; i < currentRound.size(); i += 2) {
             if (i + 1 < currentRound.size()) {
                 String key = roundIndex + "_" + currentRound.get(i).getId() + "_" + currentRound.get(i + 1).getId();
-                if (!matchResults.containsKey(key)) {
+                match = matchMap.get(key); // Reassign instead of redeclare
+                if (match == null || match.getWinner() == null) {
                     allMatchesComplete = false;
                     break;
                 }
@@ -185,13 +256,26 @@ public class BracketView extends VerticalLayout implements HasUrlParameter<Long>
             for (int i = 0; i < currentRound.size(); i += 2) {
                 if (i + 1 < currentRound.size()) {
                     String key = roundIndex + "_" + currentRound.get(i).getId() + "_" + currentRound.get(i + 1).getId();
-                    Player matchWinner = matchResults.get(key);
-                    if (matchWinner != null) {
-                        nextRound.add(matchWinner);
+                    match = matchMap.get(key); // Reassign instead of redeclare
+                    if (match != null && match.getWinner() != null) {
+                        nextRound.add(match.getWinner());
                     }
                 }
             }
-            Collections.shuffle(nextRound); // Optional: Shuffle winners for next round
+            // Create matches for next round
+            if (!nextRound.isEmpty()) {
+                Collections.shuffle(nextRound);
+                for (int i = 0; i < nextRound.size(); i += 2) {
+                    if (i + 1 < nextRound.size()) {
+                        int i1 = 4420;
+                        Player player1 = nextRound.get(i);
+                        Player player2 = nextRound.get(i + 1);
+                        match = matchService.createMatch(player1, player2, roundIndex + 1, "main",
+                                tournamentService.getTournamentById(tournamentId).get());
+                        matchMap.put((roundIndex + 1) + "_" + player1.getId() + "_" + player2.getId(), match);
+                    }
+                }
+            }
         }
 
         renderBracket();
@@ -199,10 +283,27 @@ public class BracketView extends VerticalLayout implements HasUrlParameter<Long>
 
     private void advanceLoser(Player winner, Player loser) {
         String matchKey = "losers_" + winner.getId() + "_" + loser.getId();
-        matchResults.put(matchKey, winner);
+        Match match = matchMap.get(matchKey);
+        if (match != null) {
+            matchService.updateMatchWinner(match, winner);
+        }
         losers.remove(loser);
         losers.remove(winner);
         losers.add(winner);
         renderBracket();
+    }
+
+    private void resetBracket() {
+        try {
+            Tournament tournament = tournamentService.getTournamentById(tournamentId)
+                    .orElseThrow(() -> new IllegalArgumentException("Tournament not found"));
+            matchService.deleteMatchesByTournament(tournament);
+            tournamentService.unlockTournament(tournament);
+            initializeBracket(tournament);
+            renderBracket();
+            Notification.show("Bracket reset successfully!");
+        } catch (Exception e) {
+            Notification.show("Error resetting bracket: " + e.getMessage());
+        }
     }
 }

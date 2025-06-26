@@ -32,4 +32,8 @@ public class MatchService {
     public List<Match> getMatchesByTournamentAndBracketTypeAndRound(Tournament tournament, String bracketType, int round) {
         return matchRepository.findByTournamentAndBracketTypeAndRound(tournament, bracketType, round);
     }
+
+    public void deleteMatchesByTournament(Tournament tournament) {
+        matchRepository.deleteByTournament(tournament);
+    }
 }
