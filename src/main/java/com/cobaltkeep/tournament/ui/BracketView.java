@@ -14,7 +14,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 @Route("bracket")
@@ -24,10 +26,13 @@ public class BracketView extends VerticalLayout implements HasUrlParameter<Long>
     private Long tournamentId;
     private List<List<Player>> rounds = new ArrayList<>();
     private List<Player> losers = new ArrayList<>();
+    private Map<String, Player> matchResults = new HashMap<>(); // Key: "roundIndex_player1Id_player2Id", Value: winner
 
     @Autowired
     public BracketView(TournamentService tournamentService) {
         this.tournamentService = tournamentService;
+        // Add CSS for winner highlight
+        getStyle().set("winner-button", "border: 2px solid green; padding: 5px;");
     }
 
     @Override
@@ -35,13 +40,17 @@ public class BracketView extends VerticalLayout implements HasUrlParameter<Long>
         this.tournamentId = tournamentId;
         Tournament tournament = tournamentService.getTournamentById(tournamentId)
                 .orElseThrow(() -> new IllegalArgumentException("Tournament not found"));
-        initializeBracket(new ArrayList<>(tournament.getPlayers())); // Convert Set to List
+        if (tournament.getPlayers().size() < 4 || tournament.getPlayers().size() % 2 != 0) {
+            throw new IllegalStateException("Tournament must have at least 4 players and an even number");
+        }
+        initializeBracket(new ArrayList<>(tournament.getPlayers()));
         renderBracket();
     }
 
     private void initializeBracket(List<Player> players) {
         rounds.clear();
         losers.clear();
+        matchResults.clear();
         List<Player> randomizedPlayers = new ArrayList<>(players);
         Collections.shuffle(randomizedPlayers);
         rounds.add(randomizedPlayers);
@@ -55,16 +64,35 @@ public class BracketView extends VerticalLayout implements HasUrlParameter<Long>
             List<Player> round = rounds.get(roundIndex);
             VerticalLayout roundLayout = new VerticalLayout();
             roundLayout.add(new H3("Round " + (roundIndex + 1)));
+            roundLayout.setWidth("400px");
 
             for (int i = 0; i < round.size(); i += 2) {
                 if (i + 1 < round.size()) {
                     Player player1 = round.get(i);
                     Player player2 = round.get(i + 1);
+                    String matchKey = roundIndex + "_" + player1.getId() + "_" + player2.getId();
+                    Player winner = matchResults.get(matchKey);
+
                     HorizontalLayout matchLayout = new HorizontalLayout();
+                    matchLayout.setAlignItems(Alignment.CENTER);
                     int finalRoundIndex = roundIndex;
-                    Button winner1Button = new Button(player1.getName(), e -> advancePlayer(player1, player2, finalRoundIndex));
+                    Button winner1Button = new Button(player1.getFullName(), e -> advancePlayer(player1, player2, finalRoundIndex));
                     int finalRoundIndex1 = roundIndex;
-                    Button winner2Button = new Button(player2.getName(), e -> advancePlayer(player2, player1, finalRoundIndex1));
+                    Button winner2Button = new Button(player2.getFullName(), e -> advancePlayer(player2, player1, finalRoundIndex1));
+
+                    // Highlight winner
+                    if (winner != null) {
+                        if (winner.equals(player1)) {
+                            winner1Button.addClassName("winner-button");
+                            winner1Button.setEnabled(false);
+                            winner2Button.setEnabled(false);
+                        } else if (winner.equals(player2)) {
+                            winner2Button.addClassName("winner-button");
+                            winner1Button.setEnabled(false);
+                            winner2Button.setEnabled(false);
+                        }
+                    }
+
                     matchLayout.add(winner1Button, new Button("vs"), winner2Button);
                     roundLayout.add(matchLayout);
                 }
@@ -76,49 +104,91 @@ public class BracketView extends VerticalLayout implements HasUrlParameter<Long>
         if (!losers.isEmpty()) {
             VerticalLayout losersLayout = new VerticalLayout();
             losersLayout.add(new H3("Losers Bracket"));
+            losersLayout.setWidth("400px");
             List<Player> randomizedLosers = new ArrayList<>(losers);
             Collections.shuffle(randomizedLosers);
             for (int i = 0; i < randomizedLosers.size(); i += 2) {
                 if (i + 1 < randomizedLosers.size()) {
                     Player player1 = randomizedLosers.get(i);
                     Player player2 = randomizedLosers.get(i + 1);
+                    String matchKey = "losers_" + player1.getId() + "_" + player2.getId();
+                    Player winner = matchResults.get(matchKey);
+
                     HorizontalLayout matchLayout = new HorizontalLayout();
-                    Button winner1Button = new Button(player1.getName(), e -> advanceLoser(player1, player2));
-                    Button winner2Button = new Button(player2.getName(), e -> advanceLoser(player2, player1));
+                    matchLayout.setAlignItems(Alignment.CENTER);
+                    Button winner1Button = new Button(player1.getFullName(), e -> advanceLoser(player1, player2));
+                    Button winner2Button = new Button(player2.getFullName(), e -> advanceLoser(player2, player1));
+
+                    // Highlight winner
+                    if (winner != null) {
+                        if (winner.equals(player1)) {
+                            winner1Button.addClassName("winner-button");
+                            winner1Button.setEnabled(false);
+                            winner2Button.setEnabled(false);
+                        } else if (winner.equals(player2)) {
+                            winner2Button.addClassName("winner-button");
+                            winner1Button.setEnabled(false);
+                            winner2Button.setEnabled(false);
+                        }
+                    }
+
                     matchLayout.add(winner1Button, new Button("vs"), winner2Button);
                     losersLayout.add(matchLayout);
                 }
             }
             add(losersLayout);
         }
+
+        // Check for tournament winner
+        if (rounds.size() > 1 && rounds.get(rounds.size() - 1).size() == 1) {
+            add(new H3("Winner: " + rounds.get(rounds.size() - 1).get(0).getFullName()));
+        }
     }
 
     private void advancePlayer(Player winner, Player loser, int roundIndex) {
+        String matchKey = roundIndex + "_" + winner.getId() + "_" + loser.getId();
+        matchResults.put(matchKey, winner);
         losers.add(loser);
-        List<Player> currentRound = rounds.get(roundIndex);
-        currentRound.remove(winner);
-        currentRound.remove(loser);
 
-        if (currentRound.isEmpty()) {
+        // Check if all matches in the current round are complete
+        List<Player> currentRound = rounds.get(roundIndex);
+        boolean allMatchesComplete = true;
+        for (int i = 0; i < currentRound.size(); i += 2) {
+            if (i + 1 < currentRound.size()) {
+                String key = roundIndex + "_" + currentRound.get(i).getId() + "_" + currentRound.get(i + 1).getId();
+                if (!matchResults.containsKey(key)) {
+                    allMatchesComplete = false;
+                    break;
+                }
+            }
+        }
+
+        if (allMatchesComplete) {
             List<Player> nextRound = new ArrayList<>();
             if (roundIndex + 1 < rounds.size()) {
                 nextRound = rounds.get(roundIndex + 1);
             } else {
                 rounds.add(nextRound);
             }
-            nextRound.add(winner);
-            if (nextRound.size() % 2 == 0 && !nextRound.isEmpty()) {
-                renderBracket();
+            // Add winners to the next round
+            for (int i = 0; i < currentRound.size(); i += 2) {
+                if (i + 1 < currentRound.size()) {
+                    String key = roundIndex + "_" + currentRound.get(i).getId() + "_" + currentRound.get(i + 1).getId();
+                    Player matchWinner = matchResults.get(key);
+                    if (matchWinner != null) {
+                        nextRound.add(matchWinner);
+                    }
+                }
             }
+            Collections.shuffle(nextRound); // Optional: Shuffle winners for next round
         }
 
-        if (rounds.get(roundIndex).isEmpty() && rounds.size() == roundIndex + 1 && rounds.get(roundIndex).size() == 1) {
-            add(new H3("Winner: " + winner.getName()));
-        }
         renderBracket();
     }
 
     private void advanceLoser(Player winner, Player loser) {
+        String matchKey = "losers_" + winner.getId() + "_" + loser.getId();
+        matchResults.put(matchKey, winner);
         losers.remove(loser);
         losers.remove(winner);
         losers.add(winner);

@@ -26,8 +26,8 @@ public class PlayerView extends VerticalLayout implements HasUrlParameter<Long> 
     private final TournamentService tournamentService;
     private Long tournamentId;
     private final Grid<Player> grid = new Grid<>(Player.class);
-    private final TextField name = new TextField("Player Name");
-    private final TextField email = new TextField("Player Email");
+    private final TextField firstName = new TextField("First Name");
+    private final TextField lastName = new TextField("Last Name");
     private final Button saveButton = new Button("Save");
     private final Button backButton = new Button("Back to Tournaments");
     private final Button deleteButton = new Button("Delete");
@@ -40,13 +40,12 @@ public class PlayerView extends VerticalLayout implements HasUrlParameter<Long> 
         this.tournamentService = tournamentService;
 
         // Configure grid
-        grid.setColumns("id", "name", "email");
+        grid.setColumns("id");
+        grid.addColumn(Player::getFullName).setHeader("Name");
 
         // Configure form
-        binder.forField(name).asRequired("Name is required").bind(Player::getName, Player::setName);
-        binder.forField(email)
-                .withValidator(email -> email.matches("^[\\w-\\.]+@([\\w-]+\\.)+[\\w-]{2,4}$"), "Invalid email format")
-                .bind(Player::getEmail, Player::setEmail);
+        binder.forField(firstName).asRequired("First name is required").bind(Player::getFirstName, Player::setFirstName);
+        binder.forField(lastName).asRequired("Last name is required").bind(Player::getLastName, Player::setLastName);
 
         // Configure buttons
         saveButton.addClickListener(event -> savePlayer());
@@ -57,7 +56,7 @@ public class PlayerView extends VerticalLayout implements HasUrlParameter<Long> 
         startTournamentButton.addClickListener(event -> startTournament());
 
         // Layout
-        HorizontalLayout formLayout = new HorizontalLayout(name, email, saveButton, deleteButton, backButton, startTournamentButton);
+        HorizontalLayout formLayout = new HorizontalLayout(firstName, lastName, saveButton, deleteButton, backButton, startTournamentButton);
         add(grid, formLayout);
     }
 
@@ -82,7 +81,7 @@ public class PlayerView extends VerticalLayout implements HasUrlParameter<Long> 
             dialogLayout.add("This tournament has no players. Would you like to add a new player?");
             dialogLayout.setAlignItems(FlexComponent.Alignment.CENTER);
             Button addPlayerButton = new Button("Add Player", e -> {
-                name.focus();
+                firstName.focus();
                 dialog.close();
             });
             Button cancelButton = new Button("Cancel", e -> dialog.close());
@@ -106,6 +105,8 @@ public class PlayerView extends VerticalLayout implements HasUrlParameter<Long> 
             clearForm();
         } catch (ValidationException e) {
             Notification.show("Validation error: " + e.getMessage());
+        } catch (IllegalArgumentException e) {
+            Notification.show(e.getMessage());
         } catch (Exception e) {
             Notification.show("Error saving player: " + e.getMessage());
         }
@@ -155,7 +156,7 @@ public class PlayerView extends VerticalLayout implements HasUrlParameter<Long> 
 
     private void clearForm() {
         binder.removeBean();
-        name.clear();
-        email.clear();
+        firstName.clear();
+        lastName.clear();
     }
 }

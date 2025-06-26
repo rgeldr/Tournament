@@ -8,7 +8,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.Optional;
 
 @Service
 public class PlayerService {
@@ -24,9 +23,9 @@ public class PlayerService {
     }
 
     public Player createPlayer(Player player, Long tournamentId) {
-        // Check for duplicate email
-        if (playerRepository.findByEmail(player.getEmail()).isPresent()) {
-            throw new IllegalArgumentException("Email already exists");
+        // Check for duplicate firstName and lastName combination
+        if (playerRepository.findByFirstNameAndLastName(player.getFirstName(), player.getLastName()).isPresent()) {
+            throw new IllegalArgumentException("Player with name " + player.getFirstName() + " " + player.getLastName() + " already exists");
         }
 
         // Save the player
@@ -45,9 +44,5 @@ public class PlayerService {
         }
 
         return savedPlayer;
-    }
-
-    public Optional<Player> findByEmail(String email) {
-        return playerRepository.findByEmail(email);
     }
 }
