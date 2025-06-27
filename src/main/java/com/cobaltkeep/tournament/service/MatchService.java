@@ -6,6 +6,7 @@ import com.cobaltkeep.tournament.entity.Tournament;
 import com.cobaltkeep.tournament.repository.MatchRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -15,11 +16,13 @@ public class MatchService {
     @Autowired
     private MatchRepository matchRepository;
 
+    @Transactional
     public Match createMatch(Player player1, Player player2, int round, String bracketType, Tournament tournament) {
         Match match = new Match(player1, player2, null, round, bracketType, tournament);
         return matchRepository.save(match);
     }
 
+    @Transactional
     public Match updateMatchWinner(Match match, Player winner) {
         match.setWinner(winner);
         return matchRepository.save(match);
@@ -33,6 +36,7 @@ public class MatchService {
         return matchRepository.findByTournamentAndBracketTypeAndRound(tournament, bracketType, round);
     }
 
+    @Transactional
     public void deleteMatchesByTournament(Tournament tournament) {
         matchRepository.deleteByTournament(tournament);
     }

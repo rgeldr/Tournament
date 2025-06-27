@@ -97,12 +97,17 @@ public class PlayerView extends VerticalLayout implements HasUrlParameter<Long> 
             binder.writeBean(player);
             playerService.createPlayer(player, tournamentId);
             Notification.show("Player added to tournament");
-            // Refresh grid and button states
+            
+            // Refresh grid by getting fresh data from the database
             Tournament tournament = tournamentService.getTournamentById(tournamentId)
                     .orElseThrow(() -> new IllegalArgumentException("Tournament not found"));
             grid.setItems(tournament.getPlayers());
             updateButtonStates(tournament);
             clearForm();
+            
+            // Force UI refresh
+            grid.getDataProvider().refreshAll();
+            
         } catch (ValidationException e) {
             Notification.show("Validation error: " + e.getMessage());
         } catch (IllegalArgumentException e) {
@@ -116,15 +121,19 @@ public class PlayerView extends VerticalLayout implements HasUrlParameter<Long> 
         Player selected = grid.asSingleSelect().getValue();
         if (selected != null) {
             try {
+                playerService.removePlayerFromTournament(selected.getId(), tournamentId);
+                
+                // Refresh grid by getting fresh data from the database
                 Tournament tournament = tournamentService.getTournamentById(tournamentId)
                         .orElseThrow(() -> new IllegalArgumentException("Tournament not found"));
-                tournament.getPlayers().remove(selected);
-                selected.getTournaments().remove(tournament);
-                tournamentService.createTournament(tournament);
                 grid.setItems(tournament.getPlayers());
                 Notification.show("Player removed from tournament");
                 updateButtonStates(tournament);
                 clearForm();
+                
+                // Force UI refresh
+                grid.getDataProvider().refreshAll();
+                
             } catch (Exception e) {
                 Notification.show("Error removing player: " + e.getMessage());
             }
@@ -133,10 +142,7 @@ public class PlayerView extends VerticalLayout implements HasUrlParameter<Long> 
 
     private void startTournament() {
         try {
-            Tournament tournament = tournamentService.getTournamentById(tournamentId)
-                    .orElseThrow(() -> new IllegalArgumentException("Tournament not found"));
-            tournament.setLocked(true);
-            tournamentService.createTournament(tournament);
+            tournamentService.startTournament(tournamentId);
             Notification.show("Tournament started!");
             getUI().ifPresent(ui -> ui.navigate("bracket/" + tournamentId));
         } catch (Exception e) {

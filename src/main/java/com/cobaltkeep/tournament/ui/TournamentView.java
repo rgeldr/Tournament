@@ -97,14 +97,23 @@ public class TournamentView extends VerticalLayout {
     }
 
     private void saveTournament() {
-        Tournament tournament = new Tournament();
         try {
-            binder.writeBean(tournament);
-            if (tournament.getId() == null) {
+            if (binder.getBean() == null || binder.getBean().getId() == null) {
+                // Creating new tournament
+                Tournament tournament = new Tournament();
+                binder.writeBean(tournament);
                 tournamentService.createTournament(tournament);
                 Notification.show("Tournament created");
             } else {
-                tournamentService.updateTournament(tournament.getId(), tournament);
+                // Updating existing tournament
+                Tournament existingTournament = binder.getBean();
+                Tournament updatedTournament = new Tournament();
+                binder.writeBean(updatedTournament);
+                // Preserve existing data
+                updatedTournament.setId(existingTournament.getId());
+                updatedTournament.setPlayers(existingTournament.getPlayers());
+                updatedTournament.setLocked(existingTournament.isLocked());
+                tournamentService.updateTournament(existingTournament.getId(), updatedTournament);
                 Notification.show("Tournament updated");
             }
             updateGrid();

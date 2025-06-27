@@ -6,6 +6,7 @@ import com.cobaltkeep.tournament.repository.PlayerRepository;
 import com.cobaltkeep.tournament.repository.TournamentRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -22,6 +23,7 @@ public class PlayerService {
         return playerRepository.findAll();
     }
 
+    @Transactional
     public Player createPlayer(Player player, Long tournamentId) {
         // Check for duplicate firstName and lastName combination
         if (playerRepository.findByFirstNameAndLastName(player.getFirstName(), player.getLastName()).isPresent()) {
@@ -44,5 +46,21 @@ public class PlayerService {
         }
 
         return savedPlayer;
+    }
+
+    @Transactional
+    public void removePlayerFromTournament(Long playerId, Long tournamentId) {
+        Player player = playerRepository.findById(playerId)
+                .orElseThrow(() -> new IllegalArgumentException("Player not found"));
+        Tournament tournament = tournamentRepository.findByIdWithPlayers(tournamentId)
+                .orElseThrow(() -> new IllegalArgumentException("Tournament not found"));
+        
+        if (tournament.isLocked()) {
+            throw new IllegalStateException("Tournament is locked, cannot remove players");
+        }
+        
+        tournament.getPlayers().remove(player);
+        player.getTournaments().remove(tournament);
+        tournamentRepository.save(tournament);
     }
 }
