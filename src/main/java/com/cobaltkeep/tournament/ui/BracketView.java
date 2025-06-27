@@ -247,7 +247,8 @@ public class BracketView extends VerticalLayout implements HasUrlParameter<Long>
 
                     Button player1Button = new Button(player1.getFullName() + " (" + getPlayerWins(player1) + " wins, " + getPlayerTotalPoints(player1) + " pts)");
                     Button player2Button = new Button(player2.getFullName() + " (" + getPlayerWins(player2) + " wins, " + getPlayerTotalPoints(player2) + " pts)");
-                    Button updatePointsButton = new Button("Update Points", e -> updateMatchPoints(match, player1PointsField, player2PointsField));
+                    Match finalMatch = match;
+                    Button updatePointsButton = new Button("Update Points", e -> updateMatchPoints(finalMatch, player1PointsField, player2PointsField));
 
                     // Add click handlers for advancing losers
                     player1Button.addClickListener(e -> advanceLoser(player1, player2));
