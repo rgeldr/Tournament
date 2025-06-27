@@ -4,6 +4,7 @@ import com.cobaltkeep.tournament.entity.Player;
 import com.cobaltkeep.tournament.entity.Tournament;
 import com.cobaltkeep.tournament.repository.PlayerRepository;
 import com.cobaltkeep.tournament.repository.TournamentRepository;
+import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -12,14 +13,21 @@ import java.util.List;
 @Service
 public class PlayerService {
 
-    @Autowired
-    private PlayerRepository playerRepository;
+    private final PlayerRepository playerRepository;
+    private final TournamentRepository tournamentRepository;
 
-    @Autowired
-    private TournamentRepository tournamentRepository;
+    // Constructor injection (assuming repositories are autowired)
+    public PlayerService(PlayerRepository playerRepository, TournamentRepository tournamentRepository) {
+        this.playerRepository = playerRepository;
+        this.tournamentRepository = tournamentRepository;
+    }
 
     public List<Player> getAllPlayers() {
         return playerRepository.findAll();
+    }
+
+    public List<Player> getAvailablePlayers(Long tournamentId) {
+        return playerRepository.findAvailablePlayers(tournamentId);
     }
 
     public Player createPlayer(Player player, Long tournamentId) {
@@ -45,4 +53,22 @@ public class PlayerService {
 
         return savedPlayer;
     }
+
+    @Transactional
+    public void addPlayerToTournament(Long playerId, Long tournamentId) {
+        // Fetch the player by ID
+        Player player = playerRepository.findById(playerId)
+                .orElseThrow(() -> new IllegalArgumentException("Player not found with ID: " + playerId));
+
+        // Fetch the tournament by ID
+        Tournament tournament = tournamentRepository.findById(tournamentId)
+                .orElseThrow(() -> new IllegalArgumentException("Tournament not found with ID: " + tournamentId));
+
+        // Access the tournaments collection and add the tournament if it’s not already present
+        if (!player.getTournaments().contains(tournament)) {
+            player.getTournaments().add(tournament);
+            playerRepository.save(player); // Persist the changes
+        }
+    }
+
 }

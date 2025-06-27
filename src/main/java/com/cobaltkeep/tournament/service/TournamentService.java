@@ -1,6 +1,8 @@
 package com.cobaltkeep.tournament.service;
 
+import com.cobaltkeep.tournament.entity.Player;
 import com.cobaltkeep.tournament.entity.Tournament;
+import com.cobaltkeep.tournament.repository.PlayerRepository;
 import com.cobaltkeep.tournament.repository.TournamentRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -26,6 +28,9 @@ public class TournamentService {
         return tournamentRepository.save(tournament);
     }
 
+    @Autowired
+    private PlayerRepository playerRepository;
+
     public Tournament updateTournament(Long id, Tournament tournamentDetails) {
         Tournament tournament = tournamentRepository.findById(id).orElseThrow();
         tournament.setName(tournamentDetails.getName());
@@ -39,5 +44,13 @@ public class TournamentService {
     }
 
     public void unlockTournament(Tournament tournament) {
+    }
+
+    public void addPlayersToTournament(Long tournamentId, List<Long> playerIds) {
+        Tournament tournament = tournamentRepository.findByIdWithPlayers(tournamentId)
+                .orElseThrow(() -> new IllegalArgumentException("Tournament not found"));
+        List<Player> players = playerRepository.findAllById(playerIds); // Error occurs here
+        tournament.getPlayers().addAll(players);
+        tournamentRepository.save(tournament);
     }
 }

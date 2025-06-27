@@ -17,9 +17,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Route("bracket")
 public class BracketView extends VerticalLayout implements HasUrlParameter<Long> {
@@ -234,21 +236,27 @@ public class BracketView extends VerticalLayout implements HasUrlParameter<Long>
         // Check if all matches in the current round are complete
         List<Player> currentRound = rounds.get(roundIndex);
         boolean allMatchesComplete = true;
+        int expectedPairs = currentRound.size() / 2;
+        int completedPairs = 0;
         for (int i = 0; i < currentRound.size(); i += 2) {
             if (i + 1 < currentRound.size()) {
                 String key = roundIndex + "_" + currentRound.get(i).getId() + "_" + currentRound.get(i + 1).getId();
-                match = matchMap.get(key); // Reassign instead of redeclare
-                if (match == null || match.getWinner() == null) {
+                match = matchMap.get(key);
+                if (match != null && match.getWinner() != null) {
+                    completedPairs++;
+                } else {
                     allMatchesComplete = false;
                     break;
                 }
             }
         }
+        allMatchesComplete = (completedPairs == expectedPairs);
 
         if (allMatchesComplete) {
+            int nextRoundIndex = roundIndex + 1;
             List<Player> nextRound = new ArrayList<>();
-            if (roundIndex + 1 < rounds.size()) {
-                nextRound = rounds.get(roundIndex + 1);
+            if (nextRoundIndex < rounds.size()) {
+                nextRound = rounds.get(nextRoundIndex);
             } else {
                 rounds.add(nextRound);
             }
@@ -256,23 +264,22 @@ public class BracketView extends VerticalLayout implements HasUrlParameter<Long>
             for (int i = 0; i < currentRound.size(); i += 2) {
                 if (i + 1 < currentRound.size()) {
                     String key = roundIndex + "_" + currentRound.get(i).getId() + "_" + currentRound.get(i + 1).getId();
-                    match = matchMap.get(key); // Reassign instead of redeclare
+                    match = matchMap.get(key);
                     if (match != null && match.getWinner() != null) {
                         nextRound.add(match.getWinner());
                     }
                 }
             }
             // Create matches for next round
-            if (!nextRound.isEmpty()) {
+            if (!nextRound.isEmpty() && nextRound.size() >= 2) {
                 Collections.shuffle(nextRound);
                 for (int i = 0; i < nextRound.size(); i += 2) {
                     if (i + 1 < nextRound.size()) {
-                        int i1 = 4420;
                         Player player1 = nextRound.get(i);
                         Player player2 = nextRound.get(i + 1);
-                        match = matchService.createMatch(player1, player2, roundIndex + 1, "main",
+                        match = matchService.createMatch(player1, player2, nextRoundIndex, "main",
                                 tournamentService.getTournamentById(tournamentId).get());
-                        matchMap.put((roundIndex + 1) + "_" + player1.getId() + "_" + player2.getId(), match);
+                        matchMap.put(nextRoundIndex + "_" + player1.getId() + "_" + player2.getId(), match);
                     }
                 }
             }
