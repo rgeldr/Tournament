@@ -32,6 +32,12 @@ public class Match {
     @JoinColumn(name = "tournament_id", nullable = false)
     private Tournament tournament;
 
+    @Column(name = "player1_points")
+    private Integer player1Points;
+
+    @Column(name = "player2_points")
+    private Integer player2Points;
+
     // No-arg constructor
     public Match() {}
 
@@ -43,6 +49,8 @@ public class Match {
         this.round = round;
         this.bracketType = bracketType;
         this.tournament = tournament;
+        this.player1Points = null;
+        this.player2Points = null;
     }
 
     // Getters and Setters
@@ -60,4 +68,8 @@ public class Match {
     public void setBracketType(String bracketType) { this.bracketType = bracketType; }
     public Tournament getTournament() { return tournament; }
     public void setTournament(Tournament tournament) { this.tournament = tournament; }
+    public Integer getPlayer1Points() { return player1Points; }
+    public void setPlayer1Points(Integer player1Points) { this.player1Points = player1Points; }
+    public Integer getPlayer2Points() { return player2Points; }
+    public void setPlayer2Points(Integer player2Points) { this.player2Points = player2Points; }
 }
