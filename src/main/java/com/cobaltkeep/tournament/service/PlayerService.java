@@ -4,9 +4,9 @@ import com.cobaltkeep.tournament.entity.Player;
 import com.cobaltkeep.tournament.entity.Tournament;
 import com.cobaltkeep.tournament.repository.PlayerRepository;
 import com.cobaltkeep.tournament.repository.TournamentRepository;
-import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -30,6 +30,7 @@ public class PlayerService {
         return playerRepository.findAvailablePlayers(tournamentId);
     }
 
+    @Transactional
     public Player createPlayer(Player player, Long tournamentId) {
         // Check for duplicate firstName and lastName combination
         if (playerRepository.findByFirstNameAndLastName(player.getFirstName(), player.getLastName()).isPresent()) {
@@ -60,15 +61,35 @@ public class PlayerService {
         Player player = playerRepository.findById(playerId)
                 .orElseThrow(() -> new IllegalArgumentException("Player not found with ID: " + playerId));
 
-        // Fetch the tournament by ID
-        Tournament tournament = tournamentRepository.findById(tournamentId)
+        // Fetch the tournament by ID with players
+        Tournament tournament = tournamentRepository.findByIdWithPlayers(tournamentId)
                 .orElseThrow(() -> new IllegalArgumentException("Tournament not found with ID: " + tournamentId));
 
-        // Access the tournaments collection and add the tournament if it’s not already present
-        if (!player.getTournaments().contains(tournament)) {
-            player.getTournaments().add(tournament);
-            playerRepository.save(player); // Persist the changes
+        if (tournament.isLocked()) {
+            throw new IllegalStateException("Tournament is locked, cannot add players");
+        }
+
+        // Add the player to the tournament (bidirectional relationship)
+        if (!tournament.getPlayers().contains(player)) {
+            tournament.addPlayer(player);
+            player.addTournament(tournament);
+            tournamentRepository.save(tournament);
         }
     }
 
+    @Transactional
+    public void removePlayerFromTournament(Long playerId, Long tournamentId) {
+        Player player = playerRepository.findById(playerId)
+                .orElseThrow(() -> new IllegalArgumentException("Player not found"));
+        Tournament tournament = tournamentRepository.findByIdWithPlayers(tournamentId)
+                .orElseThrow(() -> new IllegalArgumentException("Tournament not found"));
+        
+        if (tournament.isLocked()) {
+            throw new IllegalStateException("Tournament is locked, cannot remove players");
+        }
+        
+        tournament.getPlayers().remove(player);
+        player.getTournaments().remove(tournament);
+        tournamentRepository.save(tournament);
+    }
 }

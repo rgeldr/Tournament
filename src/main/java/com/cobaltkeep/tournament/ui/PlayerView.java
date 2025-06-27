@@ -81,8 +81,7 @@ public class PlayerView extends VerticalLayout implements HasUrlParameter<Long> 
         this.tournamentId = tournamentId;
         this.tournament = tournamentService.getTournamentById(tournamentId)
                 .orElseThrow(() -> new IllegalArgumentException("Tournament not found"));
-        assignedGrid.setItems(tournament.getPlayers());
-        availableGrid.setItems(playerService.getAvailablePlayers(tournamentId));
+        refreshGrids();
         Notification.show("Viewing players for tournament: " + tournament.getName());
         updateButtonStates();
     }
@@ -109,13 +108,13 @@ public class PlayerView extends VerticalLayout implements HasUrlParameter<Long> 
         Player selected = assignedGrid.asSingleSelect().getValue();
         if (selected != null) {
             try {
-                tournament.getPlayers().remove(selected);
-                selected.getTournaments().remove(tournament);
-                tournamentService.createTournament(tournament);
+                playerService.removePlayerFromTournament(selected.getId(), tournamentId);
                 refreshGrids();
                 Notification.show("Player removed from tournament");
                 updateButtonStates();
                 clearForm();
+                // Clear selection after removing
+                assignedGrid.asSingleSelect().clear();
             } catch (Exception e) {
                 Notification.show("Error removing player: " + e.getMessage());
             }
@@ -132,6 +131,8 @@ public class PlayerView extends VerticalLayout implements HasUrlParameter<Long> 
                 Notification.show("Players added to tournament");
                 refreshGrids();
                 updateButtonStates();
+                // Clear selection after adding
+                availableGrid.deselectAll();
             } catch (Exception e) {
                 Notification.show("Error adding players: " + e.getMessage());
             }
@@ -141,7 +142,7 @@ public class PlayerView extends VerticalLayout implements HasUrlParameter<Long> 
     private void startTournament() {
         try {
             tournament.setLocked(true);
-            tournamentService.createTournament(tournament);
+            tournamentService.updateTournament(tournament.getId(), tournament);
             Notification.show("Tournament started!");
             getUI().ifPresent(ui -> ui.navigate("bracket/" + tournamentId));
         } catch (Exception e) {
@@ -150,6 +151,10 @@ public class PlayerView extends VerticalLayout implements HasUrlParameter<Long> 
     }
 
     private void updateButtonStates() {
+        // Refresh tournament from database to get latest state
+        this.tournament = tournamentService.getTournamentById(tournamentId)
+                .orElseThrow(() -> new IllegalArgumentException("Tournament not found"));
+        
         boolean isLocked = tournament.isLocked();
         saveButton.setEnabled(!isLocked);
         deleteButton.setEnabled(!isLocked && assignedGrid.asSingleSelect().getValue() != null);
@@ -168,7 +173,15 @@ public class PlayerView extends VerticalLayout implements HasUrlParameter<Long> 
     }
 
     private void refreshGrids() {
+        // Refresh tournament from database to get latest state
+        this.tournament = tournamentService.getTournamentById(tournamentId)
+                .orElseThrow(() -> new IllegalArgumentException("Tournament not found"));
+        
         assignedGrid.setItems(tournament.getPlayers());
         availableGrid.setItems(playerService.getAvailablePlayers(tournamentId));
+        
+        // Force UI refresh
+        assignedGrid.getDataProvider().refreshAll();
+        availableGrid.getDataProvider().refreshAll();
     }
 }

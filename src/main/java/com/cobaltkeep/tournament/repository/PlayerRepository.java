@@ -12,8 +12,7 @@ import java.util.Optional;
 @Repository
 public interface PlayerRepository extends JpaRepository<Player, Long> {
     Optional<Player> findByFirstNameAndLastName(String firstName, String lastName);
-    @Query("SELECT p FROM Player p WHERE p NOT IN (SELECT t.players FROM Tournament t WHERE t.id = ?1)")
-    List<Player> findAvailablePlayers(Long tournamentId);
-    @Query("SELECT p FROM Player p WHERE p NOT IN (SELECT tp FROM Tournament t JOIN t.players tp WHERE t.id = :tournamentId)")
-    List<Player> findPlayersNotInTournament(@Param("tournamentId") Long tournamentId);
+    
+    @Query("SELECT p FROM Player p WHERE p NOT IN (SELECT DISTINCT p2 FROM Tournament t JOIN t.players p2 WHERE t.id = :tournamentId)")
+    List<Player> findAvailablePlayers(@Param("tournamentId") Long tournamentId);
 }
