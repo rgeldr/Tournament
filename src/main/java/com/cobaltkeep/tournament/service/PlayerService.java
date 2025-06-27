@@ -4,7 +4,6 @@ import com.cobaltkeep.tournament.entity.Player;
 import com.cobaltkeep.tournament.entity.Tournament;
 import com.cobaltkeep.tournament.repository.PlayerRepository;
 import com.cobaltkeep.tournament.repository.TournamentRepository;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
